@@ -2,6 +2,9 @@ from typing import List, Tuple
 
 import pennylane as qml
 from pennylane import numpy as np
+from pennylane.templates.layers import StronglyEntanglingLayers
+
+
 from scipy.stats import multinomial
 
 """ Note that this code is adapted from the code example for Rosalin at:
@@ -16,11 +19,14 @@ class Refoqus:
         Given one hamiltonian H = sum_{j=1}^M c_j h_j, and a set of states {rho_i}_{i=1}^N, we minimize an application-dependent loss function L:
         L(theta) = sum_{i} p_{i} l(E_{i}(theta))
 
-        E_{i}(theta) is a measurable expectation and l is a linear function in this class. 
+        E_{i}(theta) is a measurable expectation and l is a linear function in this class.
+        Here, we set the optimizer to work with StronglyEntanglingLayers for the variational part and the states are circuits obtained with VQE.
+        Such dataset construction is explained at: https://pennylane.ai/qml/datasets.html.
 
         :param dataset_of_circuits: List of input state preparation circuits, {rho_i}_{i=1}^N.
         :param hamiltonian_terms: List of hamiltonian terms h_j making the hamiltonian_terms for one datapoint. 
         :param coeffs: Coefficient c_j for each hamiltonian term h_j.
+        :param param_shape: Shape of the parameter array when applying StronglyEntanglingLayers.
         :param lr: Learning rate.
         :param min_shots: Minimal number of shots to distribute when estimating the loss.
         :param mu: Running average constant.
@@ -28,25 +34,26 @@ class Refoqus:
 
     def __init__(
         self,
-        dataset_of_circuits: List[List[qml.operation.Operation]],
+        dataset_of_circuits: List[qml.data.dataset.Dataset],
         hamiltonian_terms: List[qml.operation.Operator],
         coeffs: List[float],
+        param_shape: Tuple[int],
         lr: float = 1.0,
         min_shots: int = 2,
         mu: float = 0.99,
     ):
 
-        self.device = qml.device("default.qubit", wires=nbqbits, shots=100)
-
         self.hamiltonian_terms = hamiltonian_terms
         self.coeffs = coeffs
         self.dataset_of_circuits = dataset_of_circuits
         self.nbdata = len(self.dataset_of_circuits)
+        self.nbqbits = len(self.dataset_of_circuits[0].hamiltonian.wires)
+
+        self.device = qml.device("default.qubit", wires=self.nbqbits, shots=100)
 
         # hyperparameters
         self.min_shots = min_shots
         self.mu = mu  # running average constant
-        self.b = b  # regularization bias
         self.lr = lr  # learning rate
 
         # keep track of the total number of shots used
@@ -70,6 +77,9 @@ class Refoqus:
             (self.coeffs[j], self.hamiltonian_terms[j])
             for j in range(len(self.hamiltonian_terms))
         ] * self.nbdata
+        self.indices_preparation_circuit = [
+            i for i in range(self.nbdata) for c in self.coeffs
+        ]
 
         self.lipschitz = np.sum(self.prob_shots)
         if lr > 2 / self.lipschitz:
@@ -92,17 +102,32 @@ class Refoqus:
         results = []
 
         @qml.qnode(self.device, diff_method="parameter-shift")
-        def qnode(weights, hamiltonian_terms):
+        def qnode(
+            weights: np.ndarray,
+            hamiltonian_terms: qml.operation.Operator,
+            data_circuit: qml.data.dataset.Dataset,
+        ):
+            for op in data_circuit.vqe_gates:
+                qml.apply(op)
+
             StronglyEntanglingLayers(weights, wires=self.device.wires)
             return qml.sample(hamiltonian_terms)
 
-        for o_and_c, p, s in zip(
-            self.hamiltonian_terms_coeff_prob_shots, self.prob_shots, shots_per_term
+        for index_input_circuit, o_and_c, p, s in zip(
+            self.indices_preparation_circuit,
+            self.hamiltonian_terms_coeff_prob_shots,
+            self.prob_shots,
+            shots_per_term,
         ):
 
             if s > 0:
                 c, o = o_and_c
-                res = qnode(params, o, shots=int(s))
+                res = qnode(
+                    params,
+                    o,
+                    self.dataset_of_circuits[index_input_circuit],
+                    shots=int(s),
+                )
 
                 if s == 1:
                     res = np.array([res])
