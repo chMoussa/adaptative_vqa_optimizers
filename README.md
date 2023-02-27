@@ -9,3 +9,8 @@ We provide 3 application examples as notebooks:
 * Quantum Autoencoder [quantoencoder_example.ipynb](https://github.com/chMoussa/adaptative_vqa_optimizers/blob/main/quantoencoder_example.ipynb)
 * Variational Quantum Error Correction [vQEC.ipynb](https://github.com/chMoussa/adaptative_vqa_optimizers/blob/main/vQEC.ipynb)
 
+## About us
+
+The `my_favourite_team` team is composed of 2 members:
+- [Charles Moussa](https://www.linkedin.com/in/moussacharles/).
+- [Adrien Suau](https://adrien.suau.me).
