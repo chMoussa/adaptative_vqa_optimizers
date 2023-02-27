@@ -22,7 +22,8 @@ class Refoqus:
         E_{i}(theta) is a measurable expectation and l is a linear function in this class.
         Here, we set the optimizer to work with StronglyEntanglingLayers for the variational part and the states are circuits obtained with VQE.
         Such dataset construction is explained at: https://pennylane.ai/qml/datasets.html.
-
+        
+        :param nbqbits: Number of qubits to work on.
         :param dataset_of_circuits: List of input state preparation circuits, {rho_i}_{i=1}^N.
         :param hamiltonian_terms: List of hamiltonian terms h_j making the hamiltonian_terms for one datapoint. 
         :param coeffs: Coefficient c_j for each hamiltonian term h_j.
@@ -34,7 +35,8 @@ class Refoqus:
 
     def __init__(
         self,
-        dataset_of_circuits: List[qml.data.dataset.Dataset],
+        nbqbits: int,
+        dataset_of_circuits: List[List[qml.operation.Operation]],
         hamiltonian_terms: List[qml.operation.Operator],
         coeffs: List[float],
         param_shape: Tuple[int],
@@ -47,7 +49,7 @@ class Refoqus:
         self.coeffs = coeffs
         self.dataset_of_circuits = dataset_of_circuits
         self.nbdata = len(self.dataset_of_circuits)
-        self.nbqbits = len(self.dataset_of_circuits[0].hamiltonian.wires)
+        self.nbqbits = nbqbits
 
         self.device = qml.device("default.qubit", wires=self.nbqbits, shots=100)
 
@@ -105,9 +107,9 @@ class Refoqus:
         def qnode(
             weights: np.ndarray,
             hamiltonian_terms: qml.operation.Operator,
-            data_circuit: qml.data.dataset.Dataset,
+            data_circuit: List[qml.operation.Operation],
         ):
-            for op in data_circuit.vqe_gates:
+            for op in data_circuit:
                 qml.apply(op)
 
             StronglyEntanglingLayers(weights, wires=self.device.wires)
