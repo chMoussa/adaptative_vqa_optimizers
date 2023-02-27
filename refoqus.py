@@ -101,9 +101,12 @@ class Refoqus:
 
         # sampling ingredients
         self.one_over_nbdata = 1.0 / self.nbdata
+
         self.prob_shots = [
             np.abs(c) * self.one_over_nbdata for c in self.coeffs
         ] * self.nbdata
+        normalization = np.sum(self.prob_shots)
+        self.prob_shots = np.array(self.prob_shots) / normalization
         self.hamiltonian_terms_coeff_prob_shots = [
             (self.coeffs[j], self.hamiltonian_terms[j])
             for j in range(len(self.hamiltonian_terms))
