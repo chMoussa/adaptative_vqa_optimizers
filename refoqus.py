@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 import pennylane as qml
 from pennylane import numpy as np
@@ -20,14 +20,15 @@ class Refoqus:
         L(theta) = sum_{i} p_{i} l(E_{i}(theta))
 
         E_{i}(theta) is a measurable expectation and l is a linear function in this class.
-        Here, we set the optimizer to work with StronglyEntanglingLayers for the variational part and the states are circuits obtained with VQE.
-        Such dataset construction is explained at: https://pennylane.ai/qml/datasets.html.
+        Here, we set the optimizer to work with StronglyEntanglingLayers by default for the variational part and the states are circuits (for instance obtained with VQE experiments).
+        Example of datasets can be found at: https://pennylane.ai/qml/datasets.html.
         
         :param nbqbits: Number of qubits to work on.
         :param dataset_of_circuits: List of input state preparation circuits, {rho_i}_{i=1}^N.
         :param hamiltonian_terms: List of hamiltonian terms h_j making the hamiltonian_terms for one datapoint. 
         :param coeffs: Coefficient c_j for each hamiltonian term h_j.
-        :param param_shape: Shape of the parameter array when applying StronglyEntanglingLayers.
+        :param param_shape: Shape of the parameter array when applying StronglyEntanglingLayers as default.
+        :param function_cost_term_tosample: Python function evaluating a term of a cost function to sample. Needs to have arguments weights: np.ndarray, hamiltonian_terms: qml.operation.Operator, data_circuit: List[qml.operation.Operation].
         :param lr: Learning rate.
         :param min_shots: Minimal number of shots to distribute when estimating the loss.
         :param mu: Running average constant.
@@ -40,6 +41,7 @@ class Refoqus:
         hamiltonian_terms: List[qml.operation.Operator],
         coeffs: List[float],
         param_shape: Tuple[int],
+        function_cost_term_tosample: Callable = None,
         lr: float = 1.0,
         min_shots: int = 2,
         mu: float = 0.99,
@@ -52,6 +54,33 @@ class Refoqus:
         self.nbqbits = nbqbits
 
         self.device = qml.device("default.qubit", wires=self.nbqbits, shots=100)
+
+        self.function_cost_term_tosample = function_cost_term_tosample
+        self.qnode_caller = None
+        if self.function_cost_term_tosample is None:
+
+            def default_qnode_strongly_entangling_layer(
+                weights: np.ndarray,
+                hamiltonian_terms: qml.operation.Operator,
+                data_circuit: List[qml.operation.Operation],
+            ):
+                for op in data_circuit:
+                    qml.apply(op)
+
+                StronglyEntanglingLayers(weights, wires=self.device.wires)
+                return qml.sample(hamiltonian_terms)
+
+            self.qnode_caller = qml.QNode(
+                default_qnode_strongly_entangling_layer,
+                self.device,
+                diff_method="parameter-shift",
+            )
+        else:
+            self.qnode_caller = qml.QNode(
+                self.function_cost_term_tosample,
+                self.device,
+                diff_method="parameter-shift",
+            )
 
         # hyperparameters
         self.min_shots = min_shots
@@ -90,10 +119,10 @@ class Refoqus:
     def estimate_cost(self, params, shots) -> np.ndarray:
         """ Estimate the cost function as an expectation value wrt the hamiltonian_terms terms for the current params with the number of shots being distributed among terms.
 
-        	:param params: Current parameter values of the variational part.
-        	:param shots: Total number of shots to be distributed among hamiltonian_terms terms.
+            :param params: Current parameter values of the variational part.
+            :param shots: Total number of shots to be distributed among hamiltonian_terms terms.
 
-        	:return: Numpy array with single-shot estimates for each term.
+            :return: Numpy array with single-shot estimates for each term.
         """
 
         # construct the multinomial distribution, and sample
@@ -102,18 +131,6 @@ class Refoqus:
         shots_per_term = si.rvs()[0]
 
         results = []
-
-        @qml.qnode(self.device, diff_method="parameter-shift")
-        def qnode(
-            weights: np.ndarray,
-            hamiltonian_terms: qml.operation.Operator,
-            data_circuit: List[qml.operation.Operation],
-        ):
-            for op in data_circuit:
-                qml.apply(op)
-
-            StronglyEntanglingLayers(weights, wires=self.device.wires)
-            return qml.sample(hamiltonian_terms)
 
         for index_input_circuit, o_and_c, p, s in zip(
             self.indices_preparation_circuit,
@@ -124,7 +141,7 @@ class Refoqus:
 
             if s > 0:
                 c, o = o_and_c
-                res = qnode(
+                res = self.qnode_caller(
                     params,
                     o,
                     self.dataset_of_circuits[index_input_circuit],
@@ -142,11 +159,11 @@ class Refoqus:
     ) -> Tuple[np.ndarray]:
         """Evaluate the gradient, as well as the variance in the gradient, for the ith parameter in params, using the parameter-shift rule.
 
-        	:param i: Index of the parameter to apply the shift rule.
-        	:param params: Current parameter values of the variational part.
-        	:param shots: Total number of shots to be distributed among hamiltonian_terms terms.
+            :param i: Index of the parameter to apply the shift rule.
+            :param params: Current parameter values of the variational part.
+            :param shots: Total number of shots to be distributed among hamiltonian_terms terms.
 
-        	:return: Gradient and variance for the ith parameter in params.
+            :return: Gradient and variance for the ith parameter in params.
         """
         shift = np.zeros_like(params)
         shift[i] = np.pi / 2
