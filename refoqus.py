@@ -55,9 +55,8 @@ class Refoqus:
 
         self.device = qml.device("default.qubit", wires=self.nbqbits, shots=100)
 
-        self.function_cost_term_tosample = function_cost_term_tosample
         self.qnode_caller = None
-        if self.function_cost_term_tosample is None:
+        if function_cost_term_tosample is None:
 
             def default_qnode_strongly_entangling_layer(
                 weights: np.ndarray,
@@ -77,7 +76,7 @@ class Refoqus:
             )
         else:
             self.qnode_caller = qml.QNode(
-                self.function_cost_term_tosample,
+                function_cost_term_tosample,
                 self.device,
                 diff_method="parameter-shift",
             )
