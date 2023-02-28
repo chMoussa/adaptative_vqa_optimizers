@@ -11,6 +11,15 @@ We provide 3 application examples as notebooks:
 
 A last notebook ([vqse_example-lightning-gpu-vs-cpu.ipynb](./vqse_example-lightning-gpu-vs-cpu.ipynb)) illustrates how using a NVidia GPU accelerator to simulate the quantum circuits improves the runtime of our VQSE application by nearly 40%.
 
+Slides in a PDF format explaining our submission can be found in [the presentation_Qhack_2023.pdf file](./presentation_Qhack_2023.pdf).
+
+## Installation
+You can install the required dependencies with
+```sh
+python -m pip install -r requirements.txt
+```
+If you have any issue installing cuQuantum, please follow [https://docs.nvidia.com/cuda/cuquantum/getting_started.html#install-cuquantum-python-from-conda-forge](https://docs.nvidia.com/cuda/cuquantum/getting_started.html#install-cuquantum-python-from-conda-forge).
+
 ## About us
 
 The `my_favourite_team` team is composed of 2 members:
