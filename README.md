@@ -9,6 +9,8 @@ We provide 3 application examples as notebooks:
 * Quantum Autoencoder [quantoencoder_example.ipynb](https://github.com/chMoussa/adaptative_vqa_optimizers/blob/main/quantoencoder_example.ipynb)
 * Variational Quantum Error Correction [vQEC.ipynb](https://github.com/chMoussa/adaptative_vqa_optimizers/blob/main/vQEC.ipynb)
 
+A last notebook ([vqse_example-lightning-gpu-vs-cpu.ipynb](./vqse_example-lightning-gpu-vs-cpu.ipynb)) illustrates how using a NVidia GPU accelerator to simulate the quantum circuits improves the runtime of our VQSE application by nearly 40%.
+
 ## About us
 
 The `my_favourite_team` team is composed of 2 members:
