@@ -1,0 +1,7 @@
+pennylane 
+dill
+jupyter
+zstd
+pennylane-lightning[gpu]
+matplotlib 
+pandas
