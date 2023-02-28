@@ -45,6 +45,7 @@ class Refoqus:
         lr: float = 1.0,
         min_shots: int = 2,
         mu: float = 0.99,
+        device_name: str = "default.qubit"
     ):
 
         self.hamiltonian_terms = hamiltonian_terms
@@ -53,7 +54,7 @@ class Refoqus:
         self.nbdata = len(self.dataset_of_circuits)
         self.nbqbits = nbqbits
 
-        self.device = qml.device("default.qubit", wires=self.nbqbits, shots=100)
+        self.device = qml.device(device_name, wires=self.nbqbits, shots=100)
 
         self.qnode_caller = None
         if function_cost_term_tosample is None:
